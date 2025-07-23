@@ -7,7 +7,6 @@ from threading import Thread
 import time
 import sys
 import ctypes
-import os
 
 def is_admin():
     """检查程序是否以管理员权限运行"""
@@ -19,60 +18,47 @@ def is_admin():
 def run_as_admin():
     """重新以管理员权限启动程序"""
     if is_admin():
-        # 已经是管理员权限，直接执行主程序
         return True
     else:
-        # 不是管理员权限，尝试重新启动程序并请求权限
         print("正在请求管理员权限...")
         ctypes.windll.shell32.ShellExecuteW(
             None, "runas", sys.executable, " ".join(sys.argv), None, 1
         )
-        # 原程序退出
         return False
 
-# 在程序入口处调用
 if __name__ == "__main__":
     if not run_as_admin():
-        sys.exit(0)  # 退出原程序，等待新程序以管理员权限启动
+        sys.exit(0)
     
-    # 这里是你的主程序逻辑
     print("已获取管理员权限，开始执行程序...")
-    # 后续代码保持不变
-    # ...
+
 class UEFIEditorAssistant:
     def __init__(self, root):
         self.root = root
-        self.root.title("UEFI-Edior辅助工具 1.0  及叔出品")
+        self.root.title("UEFI-Edior辅助工具 1.2  及叔出品")
         self.root.geometry("700x600")
         self.root.configure(bg="#f0f0f0")
         
-        # 设置中文字体
         self.root.option_add("*Font", "SimHei 10")
         
-        # 工具路径（绝对路径）
+        # 工具路径
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.UEFIEXTRACT = os.path.join(self.script_dir, "UEFIExtract.exe")
         self.IFR_EXTRACTOR = os.path.join(self.script_dir, "ifrextractor.exe")
-        self.FINDVER = os.path.join(self.script_dir, "findver.exe")
-        self.CECHO = os.path.join(self.script_dir, "cecho.exe")
         self.UEFIREPLACE = os.path.join(self.script_dir, "UEFIReplace.exe")
         
         # 状态标记
-        self.setupdata_decompressed = False  # SETUPDATA解压是否成功
-        self.decompress_finished = False     # SETUPDATA解压是否完成
-        self.amitse_extracted = False        # AMITSE模块提取是否成功
+        self.setupdata_decompressed = False
+        self.decompress_finished = False
+        self.amitse_extracted = False
         
         # 语言设置
-        self.language = "zh"  # 默认中文
+        self.language = "zh"
         self.translations = self.load_translations()
         
-        # 创建界面样式
         self.create_styles()
-        
-        # 创建界面
         self.create_widgets()
         
-        # 进度变量
         self.total_steps = 0
         self.current_step = 0
 
@@ -81,19 +67,21 @@ class UEFIEditorAssistant:
         return {
             "zh": {
                 "title": "UEFI-Edior辅助工具",
-                "description": "使用此工具可以提取BIOS文件并合并修改后的模块",
+                "description": "提取BIOS文件并合并修改后的模块（支持自动识别可合并文件）",
                 "extract_button": "选择BIOS文件并提取",
-                "merge_button": "合并MOD文件",
+                "merge_button": "执行合并操作",
                 "progress_label": "进度:",
                 "status_label": "执行日志（详细）:",
                 "extract_info": "提取功能说明:\n"
                                 "1. 点击'选择BIOS文件并提取'按钮\n"
-                                "2. 选择需要提取的BIOS文件（支持所有格式）\n"
-                                "3. 程序会将文件提取到软件同目录下的_Setup文件夹",
+                                "2. 选择需要提取的BIOS文件\n"
+                                "3. 程序会将文件提取到_Setup文件夹",
                 "merge_info": "合并功能说明:\n"
-                              "1. 使用UEFI-Editor修改从BIOS中提取的模块\n"
-                              "2. 将修改后的文件名后面手动添加'MOD'后缀（例如：SETUPDATAmod.bin）\n"
-                              "3. 点击'合并MOD文件'按钮",
+                              "1. 修改提取的模块并按规则保存：\n"
+                              "   - SETUP模块 → SETUPmod.sct\n"
+                              "   - SETUPDATA模块 → SETUPDATAmod.bin\n"
+                              "2. 程序会自动识别可合并的文件（支持单独/同时合并）\n"
+                              "3. 点击'执行合并操作'按钮即可完成合并",
                 "language": "语言",
                 "chinese": "中文",
                 "english": "英文",
@@ -117,26 +105,35 @@ class UEFIEditorAssistant:
                 "failure_no_module": "失败（可能BIOS中无此模块）",
                 "all_success": "所有模块提取成功！",
                 "partial_failure": "部分模块提取失败（非必须模块可能不影响使用）",
-                "merging": "开始合并MOD文件...",
+                "merging": "开始合并操作...",
+                "merging_setup": "正在合并SETUP模块...",
+                "merging_setupdata": "正在合并SETUPDATA模块...",
                 "merge_success": "合并成功！输出文件: {0}",
                 "merge_failure": "合并失败（未生成输出文件）",
-                "merge_complete": "合并完成！修改后的BIOS已保存到:\n{0}"
+                "merge_complete_setup": "SETUP模块合并完成！修改后的BIOS已保存到:\n{0}",
+                "merge_complete_setupdata": "SETUPDATA模块合并完成！修改后的BIOS已保存到:\n{0}",
+                "merge_complete_both": "两种模块合并完成！修改后的BIOS已保存到:\n{0}",
+                "no_merge_files": "未检测到任何可合并文件（需要SETUPmod.sct或SETUPDATAmod.bin）",
+                "setup_mod_missing": "未找到SETUPmod.sct，跳过SETUP模块合并",
+                "setupdata_mod_missing": "未找到SETUPDATAmod.bin，跳过SETUPDATA模块合并"
             },
             "en": {
                 "title": "UEFI-Editor Assistant",
-                "description": "Use this tool to extract BIOS files and merge modified modules",
+                "description": "Extract BIOS files and merge modified modules (auto-detect mergeable files)",
                 "extract_button": "Select BIOS File and Extract",
-                "merge_button": "Merge MOD File",
+                "merge_button": "Perform Merge Operation",
                 "progress_label": "Progress:",
                 "status_label": "Execution Log (Detailed):",
-                "extract_info": "Extraction Function Instructions:\n"
-                                "1. Click the 'Select BIOS File and Extract' button\n"
-                                "2. Select the BIOS file to be extracted (supports all formats)\n"
-                                "3. The program will extract the file to the '_Setup' folder in the same directory as the software",
-                "merge_info": "Merge Function Instructions:\n"
-                              "1. Modify the module extracted from the BIOS using UEFI-Editor\n"
-                              "2. Manually add the 'MOD' suffix to the modified file name (e.g., SETUPDATAmod.bin)\n"
-                              "3. Click the 'Merge MOD File' button",
+                "extract_info": "Extraction Instructions:\n"
+                                "1. Click 'Select BIOS File and Extract'\n"
+                                "2. Select the BIOS file to extract\n"
+                                "3. Files will be extracted to _Setup folder",
+                "merge_info": "Merge Instructions:\n"
+                              "1. Modify extracted modules and save as:\n"
+                              "   - SETUP module → SETUPmod.sct\n"
+                              "   - SETUPDATA module → SETUPDATAmod.bin\n"
+                              "2. The program automatically identifies mergeable files\n"
+                              "3. Click 'Perform Merge Operation' to complete merging",
                 "language": "Language",
                 "chinese": "Chinese",
                 "english": "English",
@@ -160,10 +157,17 @@ class UEFIEditorAssistant:
                 "failure_no_module": "Failure (Module may not exist in BIOS)",
                 "all_success": "All modules extracted successfully!",
                 "partial_failure": "Some modules failed to extract (non-essential modules may not affect usage)",
-                "merging": "Starting to merge MOD file...",
+                "merging": "Starting merge operation...",
+                "merging_setup": "Merging SETUP module...",
+                "merging_setupdata": "Merging SETUPDATA module...",
                 "merge_success": "Merge successful! Output file: {0}",
                 "merge_failure": "Merge failed (output file not generated)",
-                "merge_complete": "Merge completed! Modified BIOS saved to:\n{0}"
+                "merge_complete_setup": "SETUP module merge completed! Modified BIOS saved to:\n{0}",
+                "merge_complete_setupdata": "SETUPDATA module merge completed! Modified BIOS saved to:\n{0}",
+                "merge_complete_both": "Both modules merged! Modified BIOS saved to:\n{0}",
+                "no_merge_files": "No mergeable files detected (requires SETUPmod.sct or SETUPDATAmod.bin)",
+                "setup_mod_missing": "SETUPmod.sct not found, skipping SETUP module merge",
+                "setupdata_mod_missing": "SETUPDATAmod.bin not found, skipping SETUPDATA module merge"
             }
         }
 
@@ -171,14 +175,12 @@ class UEFIEditorAssistant:
         """创建自定义样式"""
         style = ttk.Style()
         
-        # 配置标题标签样式（恢复原始样式）
         style.configure("Title.TLabel", 
                         background="#4a7abc", 
                         foreground="white",
                         font=("SimHei", 18, "bold"),
-                        anchor="center")  # 确保标题居中
+                        anchor="center")
         
-        # 配置ttk按钮样式（恢复原始样式）
         style.configure("Extraction.TButton",
                        font=("SimHei", 12),
                        foreground="white",
@@ -191,13 +193,11 @@ class UEFIEditorAssistant:
                        background="#2196F3",
                        padding=10)
         
-        # 为按钮添加状态样式（悬停、按下等）
         style.map("Extraction.TButton",
                  background=[('active', '#45a049'), ('pressed', '#3d8b40')])
         style.map("Merge.TButton",
                  background=[('active', '#0b7dda'), ('pressed', '#0066cc')])
         
-        # 配置进度条样式
         style.configure("Custom.Horizontal.TProgressbar",
                        background="#4CAF50",
                        troughcolor="#d9d9d9",
@@ -205,23 +205,21 @@ class UEFIEditorAssistant:
                        lightcolor="#4CAF50",
                        darkcolor="#4CAF50")
         
-        # 配置文本框样式
         style.configure("TFrame", background="#f0f0f0")
         style.configure("TLabel", background="#f0f0f0")
 
     def create_widgets(self):
-        # 顶部标题（使用tkinter原生Label确保样式一致性）
+        # 顶部标题
         title_frame = ttk.Frame(self.root)
         title_frame.pack(fill=tk.X, padx=10, pady=10)
-        title_frame.configure(style="TFrame")
         
         self.title_label = tk.Label(title_frame, 
                               text=self.translations[self.language]["title"], 
                               font=("SimHei", 18, "bold"),
                               bg="#4a7abc",
                               fg="white",
-                              anchor="center")  # 确保标题居中
-        self.title_label.pack(fill=tk.X)  # 填充整个宽度
+                              anchor="center")
+        self.title_label.pack(fill=tk.X)
         
         # 语言选择
         lang_frame = ttk.Frame(self.root)
@@ -244,13 +242,13 @@ class UEFIEditorAssistant:
                              font=("SimHei", 11))
         self.desc_label.pack()
         
-        # 按钮区域
+        # 按钮区域（移除了检测提示区域）
         btn_frame = ttk.Frame(self.root)
         btn_frame.pack(fill=tk.X, padx=10, pady=20)
         btn_frame.columnconfigure(0, weight=1)
         btn_frame.columnconfigure(1, weight=1)
         
-        # 左侧按钮（提取）- 使用tkinter原生Button确保样式一致性
+        # 左侧按钮（提取）
         left_btn_frame = ttk.Frame(btn_frame)
         left_btn_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5))
         
@@ -264,7 +262,7 @@ class UEFIEditorAssistant:
                                     bd=2)
         self.btn_extract.pack(pady=5, fill=tk.X)
         
-        # 右侧按钮（合并）- 使用tkinter原生Button确保样式一致性
+        # 右侧按钮（合并）- 直接显示按钮，无检测提示
         right_btn_frame = ttk.Frame(btn_frame)
         right_btn_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10))
         
@@ -297,7 +295,6 @@ class UEFIEditorAssistant:
                                            style="Custom.Horizontal.TProgressbar")
         self.progress_bar.pack(fill=tk.X, padx=2, pady=2)
         
-        # 进度百分比标签
         self.progress_percent = tk.Label(progress_bar_frame, 
                                         text="0%", 
                                         font=("SimHei", 10, "bold"), 
@@ -310,7 +307,7 @@ class UEFIEditorAssistant:
         paned_window = ttk.PanedWindow(self.root, orient=tk.VERTICAL)
         paned_window.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # 状态文本框（扩大日志区域）
+        # 状态文本框
         status_frame = ttk.Frame(paned_window)
         paned_window.add(status_frame, weight=4)
         
@@ -318,7 +315,6 @@ class UEFIEditorAssistant:
                                text=self.translations[self.language]["status_label"])
         self.status_label.pack(anchor=tk.W)
         
-        # 日志显示区域
         self.status_text = tk.Text(status_frame, wrap=tk.WORD,
                                   bg="white", fg="#333333",
                                   font=("SimHei", 10),
@@ -331,16 +327,14 @@ class UEFIEditorAssistant:
         self.status_text.config(yscrollcommand=scrollbar.set)
         
         # 说明文本区域
-        info_frame = ttk.Frame(paned_window, relief=tk.SUNKEN)
+        info_frame = ttk.Frame(paned_window)
         paned_window.add(info_frame, weight=1)
         
-        # 提取功能说明
         self.extract_info = ttk.Label(info_frame, 
                               text=self.translations[self.language]["extract_info"],
                               justify=tk.LEFT, wraplength=680)
         self.extract_info.pack(anchor=tk.NW, padx=10, pady=5)
         
-        # 合并功能说明
         self.merge_info = ttk.Label(info_frame, 
                            text=self.translations[self.language]["merge_info"],
                            justify=tk.LEFT, wraplength=680)
@@ -365,8 +359,7 @@ class UEFIEditorAssistant:
         self.status_text.delete(1.0, tk.END)
 
     def update_status(self, message, *args):
-        """更新日志显示（带时间戳）"""
-        # 格式化消息
+        """更新日志显示"""
         if args:
             message = message.format(*args)
             
@@ -465,7 +458,7 @@ class UEFIEditorAssistant:
             
         self.update_status(self.translations[self.language]["decompressing"])
         
-        # 先判断是否需要解压，避免创建无用目录
+        # 判断是否需要解压
         try:
             if os.path.getsize(setupdata_abs) < 1024 * 1024:  # 1MB阈值
                 self.update_status("SETUPDATA.bin无需解压（文件大小较小，视为未压缩状态）")
@@ -475,7 +468,7 @@ class UEFIEditorAssistant:
         except Exception as e:
             self.update_status(f"判断文件是否需要解压时出错: {str(e)}")
         
-        # 必须解压时才创建目录
+        # 创建解压目录
         unpack_dir = os.path.abspath("_Setup\\SETUPDATA_unpacked")
         try:
             if os.path.exists(unpack_dir):
@@ -745,66 +738,167 @@ class UEFIEditorAssistant:
             # 恢复按钮
             self.btn_extract.config(state=tk.NORMAL)
             self.btn_merge.config(state=tk.NORMAL)
+    
+    # 合并SETUP模块的方法
+    def merge_setup_module(self, bios_file, output_file):
+        """合并SETUP模块（SETUPmod.sct）"""
+        MODIFIED_FILE = os.path.abspath("_Setup\\SETUPmod.sct")
+        MODULE_GUID = "899407D7-99FE-43D8-9A21-79EC328CAC21"  # SETUP模块GUID
+        SECTION_TYPE = "18"  # SETUP模块类型
+        
+        # 检查修改文件是否存在
+        if not os.path.exists(MODIFIED_FILE) or os.path.getsize(MODIFIED_FILE) == 0:
+            self.update_status(self.translations[self.language]["setup_mod_missing"])
+            return False, None
+            
+        # 执行合并
+        try:
+            self.update_status(self.translations[self.language]["merging_setup"])
+            command = f'"{self.UEFIREPLACE}" "{bios_file}" "{MODULE_GUID}" "{SECTION_TYPE}" "{MODIFIED_FILE}" -o "{output_file}"'
+            self.update_status(f"执行SETUP合并命令: {command}")
+            
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            
+            # 检查合并结果
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                self.update_status(self.translations[self.language]["merge_success"], output_file)
+                return True, output_file
+            else:
+                self.update_status(self.translations[self.language]["merge_failure"])
+                self.update_status(f"命令输出: {result.stdout}")
+                self.update_status(f"命令错误: {result.stderr}")
+                return False, None
+        except Exception as e:
+            self.update_status(f"SETUP模块合并出错: {str(e)}")
+            return False, None
+    
+    # 合并SETUPDATA模块的方法
+    def merge_setupdata_module(self, bios_file, output_file):
+        """合并SETUPDATA模块（SETUPDATAmod.bin）"""
+        MODIFIED_FILE = os.path.abspath("_Setup\\SETUPDATAmod.bin")
+        MODULE_GUID = "FE612B72-203C-47B1-8560-A66D946EB371"  # SETUPDATA模块GUID
+        SECTION_TYPE = "18"  # SETUPDATA模块类型
+        
+        # 检查修改文件是否存在
+        if not os.path.exists(MODIFIED_FILE) or os.path.getsize(MODIFIED_FILE) == 0:
+            self.update_status(self.translations[self.language]["setupdata_mod_missing"])
+            return False, None
+            
+        # 执行合并
+        try:
+            self.update_status(self.translations[self.language]["merging_setupdata"])
+            command = f'"{self.UEFIREPLACE}" "{bios_file}" "{MODULE_GUID}" "{SECTION_TYPE}" "{MODIFIED_FILE}" -o "{output_file}"'
+            self.update_status(f"执行SETUPDATA合并命令: {command}")
+            
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            
+            # 检查合并结果
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                self.update_status(self.translations[self.language]["merge_success"], output_file)
+                return True, output_file
+            else:
+                self.update_status(self.translations[self.language]["merge_failure"])
+                self.update_status(f"命令输出: {result.stdout}")
+                self.update_status(f"命令错误: {result.stderr}")
+                return False, None
+        except Exception as e:
+            self.update_status(f"SETUPDATA模块合并出错: {str(e)}")
+            return False, None
             
     def run_replace_script(self):
-        """执行合并脚本"""
-        self.total_steps = 3
-        self.current_step = 0
-        self.progress_var.set(0)
+        """执行合并逻辑"""
         self.status_text.delete(1.0, tk.END)
-        
         self.btn_extract.config(state=tk.DISABLED)
         self.btn_merge.config(state=tk.DISABLED)
         
         Thread(target=self._run_replace_script, daemon=True).start()
         
     def _run_replace_script(self):
-        """合并核心逻辑"""
+        """合并核心逻辑（自动检测可合并文件）"""
         try:
+            # 基础路径
             BIOS_FILE = os.path.abspath("_Setup\\original_BIOS.bin")
-            MODIFIED_FILE = os.path.abspath("_Setup\\SETUPDATAmod.bin")
-            OUTPUT_BIOS = os.path.abspath("_Setup\\BIOS_modified.bin")
-            MODULE_GUID = "FE612B72-203C-47B1-8560-A66D946EB371"
-            SECTION_TYPE = "18"
+            BASE_OUTPUT = os.path.abspath("_Setup\\BIOS_modified")
+            
+            # 检测可合并文件（实际存在性）
+            setup_mod_exists = os.path.exists(os.path.abspath("_Setup\\SETUPmod.sct")) and os.path.getsize(os.path.abspath("_Setup\\SETUPmod.sct")) > 0
+            setupdata_mod_exists = os.path.exists(os.path.abspath("_Setup\\SETUPDATAmod.bin")) and os.path.getsize(os.path.abspath("_Setup\\SETUPDATAmod.bin")) > 0
+            
+            # 检查是否有可合并文件
+            if not setup_mod_exists and not setupdata_mod_exists:
+                self.update_status(self.translations[self.language]["no_merge_files"])
+                messagebox.showerror("错误", self.translations[self.language]["no_merge_files"])
+                return
+                
+            # 根据实际可合并文件数量设置步骤数
+            merge_count = 0
+            if setup_mod_exists:
+                merge_count += 1
+            if setupdata_mod_exists:
+                merge_count += 1
+            self.total_steps = merge_count + 1  # 检查步骤 + 合并步骤数
             
             self.update_status(self.translations[self.language]["merging"])
             
-            # 检查文件
+            # 检查基础文件
             missing = []
-            for f, name in [(BIOS_FILE, "原始BIOS"), (MODIFIED_FILE, "修改后的SETUPDATAmod.bin"), (self.UEFIREPLACE, "UEFIReplace.exe")]:
-                if not os.path.exists(f):
-                    missing.append(f"{name}（{f}）")
+            if not os.path.exists(BIOS_FILE):
+                missing.append(f"原始BIOS文件（{BIOS_FILE}）")
+            if not os.path.exists(self.UEFIREPLACE):
+                missing.append(f"UEFIReplace.exe（{self.UEFIREPLACE}）")
+                
             if missing:
                 self.update_status("缺少合并所需文件：")
                 for m in missing:
                     self.update_status(f"- {m}")
-                messagebox.showerror("错误", f"缺少文件：\n{', '.join([m.split('（')[0] for m in missing])}")
+                messagebox.showerror("错误", f"缺少文件：\n{', '.join(missing)}")
                 return
                 
             self.update_progress()
             
-            # 执行合并
-            command = f'"{self.UEFIREPLACE}" "{BIOS_FILE}" "{MODULE_GUID}" "{SECTION_TYPE}" "{MODIFIED_FILE}" -o "{OUTPUT_BIOS}"'
-            self.update_status(f"执行合并命令: {command}")
+            # 执行合并（根据实际存在的文件）
+            current_bios = BIOS_FILE  # 当前使用的BIOS文件
+            final_output = ""
             
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            # 合并SETUP模块（如果存在）
+            if setup_mod_exists:
+                temp_output = f"{BASE_OUTPUT}_setup_temp.bin"
+                success, output = self.merge_setup_module(current_bios, temp_output)
+                if success and output:
+                    current_bios = output  # 更新当前BIOS文件
+                    final_output = output
+                self.update_progress()
             
-            if os.path.exists(OUTPUT_BIOS) and os.path.getsize(OUTPUT_BIOS) > 0:
-                self.update_status(self.translations[self.language]["merge_success"], OUTPUT_BIOS)
+            # 合并SETUPDATA模块（如果存在）
+            if setupdata_mod_exists:
+                # 根据是否已合并SETUP模块确定输出文件名
+                if setup_mod_exists:
+                    output_file = f"{BASE_OUTPUT}_both.bin"
+                else:
+                    output_file = f"{BASE_OUTPUT}_setupdata.bin"
+                    
+                success, output = self.merge_setupdata_module(current_bios, output_file)
+                if success and output:
+                    final_output = output  # 更新最终输出
+                self.update_progress()
+            
+            # 检查最终结果
+            if os.path.exists(final_output) and os.path.getsize(final_output) > 0:
+                # 根据合并类型显示对应信息
+                if setup_mod_exists and setupdata_mod_exists:
+                    msg = self.translations[self.language]["merge_complete_both"].format(final_output)
+                elif setup_mod_exists:
+                    msg = self.translations[self.language]["merge_complete_setup"].format(final_output)
+                else:  # 仅setupdata
+                    msg = self.translations[self.language]["merge_complete_setupdata"].format(final_output)
+                    
+                self.update_status(msg)
+                messagebox.showinfo("成功", msg)
             else:
                 self.update_status(self.translations[self.language]["merge_failure"])
-                self.update_status(f"命令输出: {result.stdout}")
-                self.update_status(f"命令错误: {result.stderr}")
                 messagebox.showerror("错误", "合并失败")
                 return
                 
-            self.update_progress()
-            
-            # 显示结果
-            self.update_status(self.translations[self.language]["merge_complete"], OUTPUT_BIOS)
-            messagebox.showinfo("成功", self.translations[self.language]["merge_complete"].format(OUTPUT_BIOS))
-            self.update_progress()
-            
         except Exception as e:
             self.update_status(f"合并出错: {str(e)}")
             messagebox.showerror("错误", f"合并出错: {str(e)}")
