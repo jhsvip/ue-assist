@@ -44,7 +44,7 @@ Check core files in the `_Setup` folder: `amitse.sct`, `original_BIOS.bin`, `SET
 
 
 ### 3.2 上传文件到UEFI Editor（Upload Files to UEFI Editor）
-打开浏览器访问`https://boringboredom.github.io/UEFI-Editor/`，分别上传`_Setup`文件夹中的对应文件：  
+打开浏览器访问`https://boringboredom.github.io/UEFI-Editor/`，分别上传`_Setup`文件夹中的对应文件：  国内汉化后的网站：http://ue.5argb.com/
 - 点击`Setup SCT`上传`SETUP.sct`  
 - 点击`IFR Extractor output TXT`上传`setup_ifr.txt`  
 - 点击`AMITSE SCT`上传`amitse.sct`  
