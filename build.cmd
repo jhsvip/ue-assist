@@ -1,0 +1,1 @@
+pyinstaller ./uefi_editor.spec
